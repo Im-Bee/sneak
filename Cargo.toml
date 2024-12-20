@@ -1,0 +1,12 @@
+[package]
+name = "Sneak"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+derivative = "2.2.0"
+rand = "0.8"
+
+[target.'cfg(windows)'.dependencies]
+winapi = { version = "0.3", features = ["winuser", "consoleapi", "processenv"] }
+
