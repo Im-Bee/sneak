@@ -365,6 +365,7 @@ mod game_logic {
 
     struct Peace {
         pixels: Box<MashedPixels>,
+        index: usize,
     }
     
     struct Sneak {
@@ -438,7 +439,7 @@ mod game_logic {
             let ma = Sneak::initialize(output, &w);
             let mut apples_vec = Vec::<Apple>::new();
             let mut sneak_vec = Vec::<Peace>::new();
-            for _i in 0..15 {
+            for _i in 0..12 {
                 apples_vec.push(Apple {
                     pixels: Box::new(MashedPixels {
                         sqare: Square { position: (Vec2i16 { 
@@ -460,6 +461,7 @@ mod game_logic {
                             y: -1 }), 
                             size:     (Vec2i16 { x: 1, y: 1 }) },
                     }),
+                    index: -1_isize as usize,
                 } );
 
                 sneak_vec.last().unwrap().pixels.initialize(output);
@@ -474,6 +476,10 @@ mod game_logic {
                 sneak_peaces: sneak_vec,
                 last_input: input.last.clone(),
             }
+        }
+        
+        pub fn get_score(&mut self) -> i32 {
+            self.main_actor.collected
         }
 
         pub fn update(&mut self) {
@@ -524,13 +530,7 @@ mod game_logic {
             }
         
             let cur_snake_pos = self.main_actor.pixels.get_pos().clone();
-            if crate::game_logic::Game::check_is_in_deadly_collison(&self, &cur_snake_pos) {
-                self.alive = false;
-            }
-            if crate::game_logic::Game::check_is_in_happy_collison(self, &cur_snake_pos) {
-                self.main_actor.collected = self.main_actor.collected + 1;
-            }
-            if self.tick % 10 == 0 {
+            if self.tick % 20 == 0 {
                 let mut random_vec = crate::game_logic::Game::random_vec2i16();
 
                 random_vec.y = (random_vec.y + 1) % self.world.size.y;    
@@ -546,12 +546,41 @@ mod game_logic {
                     break;
                 }
             }
-            if self.main_actor.collected > 0 {
-                for i in 1..self.main_actor.collected {
-                    self.sneak_peaces.swap(0, i as usize);
-                }
+            if crate::game_logic::Game::check_is_in_deadly_collison(&self, &cur_snake_pos) {
+                self.alive = false;
+            }
 
-                self.sneak_peaces[(self.main_actor.collected - 1) as usize].pixels.set_pos(last_pos);
+            if crate::game_logic::Game::check_is_in_happy_collison(self, &cur_snake_pos) {
+                self.main_actor.collected = self.main_actor.collected + 1;
+
+                for i in 0..(self.main_actor.collected) as usize {
+                    if self.sneak_peaces[i].index == -1_isize as usize {
+                        self.sneak_peaces[i].index = 0;
+                        continue;
+                    }
+
+                    self.sneak_peaces[i].index = self.sneak_peaces[i].index + 1;
+                    
+                    if self.sneak_peaces[i].index == (self.main_actor.collected - 1) as usize {
+                        self.sneak_peaces[i].pixels.set_pos(last_pos);
+                    }
+                }
+            }
+            else if self.main_actor.collected == 1 {
+                self.sneak_peaces[0].pixels.set_pos(last_pos);
+            }
+            else if self.main_actor.collected > 0 {
+                for i in 0..(self.main_actor.collected) as usize {
+                    if self.sneak_peaces[i].index == (self.main_actor.collected - 1) as usize {
+                        self.sneak_peaces[i].index = 0;
+                        continue;
+                    }
+                    if self.sneak_peaces[i].index == (self.main_actor.collected - 2) as usize {
+                        self.sneak_peaces[i].pixels.set_pos(last_pos);
+                    }
+
+                    self.sneak_peaces[i].index = self.sneak_peaces[i].index + 1;
+                }
             }
 
             self.tick = self.tick + 1;
@@ -575,6 +604,21 @@ mod game_logic {
             for i in self.world.walls.iter() {
                 let wall_pos = i.get_pos();
                 let wall_size = i.get_size();
+                let x_diff = coord.x - wall_pos.x;
+                let y_diff = coord.y - wall_pos.y;
+    
+                if x_diff < 0 || y_diff < 0 {
+                    continue;
+                }
+
+                if x_diff < wall_size.x &&
+                    y_diff < wall_size.y {
+                    return true;
+                }
+            }
+            for i in self.sneak_peaces.iter() {
+                let wall_pos = i.pixels.get_pos();
+                let wall_size = i.pixels.get_size();
                 let x_diff = coord.x - wall_pos.x;
                 let y_diff = coord.y - wall_pos.y;
     
@@ -707,5 +751,7 @@ fn main() {
     };
 
     i.destroy();
+
+    println!("score {}", g.get_score());
 }
 
